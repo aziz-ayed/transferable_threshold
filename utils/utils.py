@@ -4,101 +4,124 @@ import scipy.stats as t
 from sklearn.utils import resample
 
 
-def find_threshold(df, precision = 0.1, gran = 101, risk = "risk_6", golds = "golds"):
+def compute_ppv(scores, y, tau, weights=None):
+    """
+    Computes the weighted PPV.
     
-    results = np.zeros(gran)
-    linsp = np.linspace(0, 1, gran)
+    Parameters:
+    - scores: Array-like, predictive risk scores for each observation.
+    - y: Array-like, actual binary outcomes (1 for positive, 0 for negative).
+    - tau: Threshold score for considering a prediction as positive.
+    - weights: Optional, array-like, weights for each observation. If None, all observations are equally weighted.
     
-    idx = 0
-    
-    for i in linsp:
-        
-        sub_df = df[df[risk] >= i]
-        results[idx] = len(sub_df) and len(sub_df[sub_df[golds] == 1]) / len(sub_df) or -1
-        idx += 1
-    
-    thresh = next((i for i, x in enumerate(results) if x >= precision), 0)
-    
-    return (linsp[thresh] or 0), results
-
-
-def compute_precision(scores, y, tau, weights = None):
-    
-    ## P(Y = 1 l s >= tau)   
+    Returns:
+    - Weighted precision as a float, or np.nan if computation is not possible.
+    """
     
     scores = np.array(scores)
     y = np.array(y)
+    weights = np.ones_like(scores) if weights is None else np.array(weights)
     
-    if weights is None:
-        weights = np.ones(len(scores))
+    # Filter based on the score threshold
+    valid_indices = scores >= tau
+    scores_filtered = scores[valid_indices]
+    y_filtered = y[valid_indices]
+    weights_filtered = weights[valid_indices]
+    
+    # Check if there are any scores above the threshold to avoid division by zero
+    if scores_filtered.size > 0:
+        return np.average(y_filtered, weights=weights_filtered)
     else:
-        weights = np.array(weights)
-    try:
-        
-        return np.average(y[scores >= tau], weights = weights[scores >= tau])
-    
-    except:
-        
         return np.nan
     
-def compute_npv(scores, y, tau, weights = None):
+def compute_npv(scores, y, tau, weights=None):
+    """
+    Computes the weighted NPV for a given threshold tau.
     
-    ## P(Y = 1 l s <= tau)   
+    Parameters:
+    - scores: Array-like, predictive scores for each observation.
+    - y: Array-like, actual binary outcomes (0 for negative, 1 for positive).
+    - tau: Threshold score for considering a prediction as negative.
+    - weights: Optional, array-like, weights for each observation. If None, all observations are equally weighted.
+    
+    Returns:
+    - Weighted NPV as a float, or np.nan if computation is not possible.
+    """
     
     scores = np.array(scores)
     y = np.array(y)
+    weights = np.ones_like(scores) if weights is None else np.array(weights)
     
-    if weights is None:
-        weights = np.ones(len(scores))
+    # Filter based on the score threshold for negative predictions
+    negative_indices = scores < tau
+    scores_negative = scores[negative_indices]
+    y_negative = y[negative_indices]
+    weights_negative = weights[negative_indices]
+    
+    if scores_negative.size > 0:
+        # Compute NPV as 1 - weighted average of y in negatives, since y=1 indicates a false negative
+        true_negative_rate = np.average((y_negative == 0).astype(int), weights=weights_negative)
+        return true_negative_rate
     else:
-        weights = np.array(weights)
-    try:
-        
-        return 1 - np.average(y[scores < tau], weights = weights[scores < tau])
+        return np.nan
+
+def find_tau(scores, y, alpha, weights=None):
     
-    except:
-        
+    """
+    Find the smallest threshold (tau) for scores such that the weighted PPV is at least alpha.
+    
+    Parameters:
+    - scores: Array-like, the risk scores assigned to each observation.
+    - y: Array-like, the binary outcome associated with each score (1 for positive, 0 for negative).
+    - alpha: The minimum desired PPV.
+    - weights: Optional, array-like, the weights for each observation. If not provided, all observations are equally weighted.
+    
+    Returns:
+    - The threshold score (tau) if such a threshold exists; otherwise, np.nan.
+    """
+    
+    scores = np.array(scores)
+    y = np.array(y)
+    weights = np.ones_like(scores) if weights is None else np.array(weights)
+    
+    # Filter arrays based on positive weights
+    filter_pos_weights = weights > 0
+    scores, y, weights = scores[filter_pos_weights], y[filter_pos_weights], weights[filter_pos_weights]
+    
+    # Sort by scores in descending order
+    perm = np.argsort(scores)[::-1]
+    scores, y, weights = scores[perm], y[perm], weights[perm]
+    
+    # Compute cumulative weighted sums
+    cum_weights = np.cumsum(weights)
+    cum_weighted_y = np.cumsum(weights * y)
+    
+    # Calculate PPV at each threshold
+    ppv = cum_weighted_y / cum_weights
+    
+    # Find the smallest threshold where PPV meets or exceeds alpha
+    valid_indices = np.where(ppv >= alpha)[0]
+    if valid_indices.size > 0:
+        return scores[np.max(valid_indices)]
+    else:
         return np.nan    
-
-def find_tau(scores, y, alpha, weights = None):
-    
-    scores = np.array(scores)
-    y = np.array(y)
-    
-    if weights is None:    
-        weights = np.ones(len(scores))
-    else:
-        weights = np.array(weights)
-        scores = scores[weights > 0]
-        y = y[weights > 0]
-        weights = weights[weights > 0]
         
-    weighted_score = weights * y
-    
-    weighted_score = weighted_score
-    
-    permutations = np.argsort(scores)[::-1]
-    
-    weights = weights[permutations]
-    scores = scores[permutations]
-    y = y[permutations]
-    
-    c_weights = np.cumsum(weights)
-    c_wy = np.cumsum(weights * y)
-    
-    precisions = c_wy / c_weights
-    
-    try:
-        return scores[np.max(np.where(precisions >= alpha)[0])]
-    except: 
-        return np.nan
-    
 def compute_coverage(scores, tau):
+    """
+    Computes the coverage (proportion of scores greater than or equal to tau) of a given set of scores.
+    
+    Parameters:
+    - scores: Array-like, the scores to be evaluated.
+    - tau: Float, the threshold score for coverage calculation.
+    
+    Returns:
+    - The coverage as a float, representing the proportion of scores >= tau.
+    """
     
     scores = np.array(scores)
+    coverage = np.mean(scores >= tau)
     
-    return len(scores[scores >= tau]) / len(scores)    
-    
+    return coverage
 def weighted_average(values, weights):
     """
     Compute a weighted average ignoring NaN values.
@@ -165,10 +188,22 @@ def weighted_median(values, weights):
     else:
         return values[median_index]
     
-def stratified_sample(df, strat_col, frac, state = 0):
-    def sampling_strategy(group):
-        return group.sample(frac=frac, random_state = state)
-    return df.groupby(strat_col, group_keys=False).apply(sampling_strategy)
+def stratified_sample(df, strat_col, frac, state=0):
+    """
+    Performs stratified sampling from a DataFrame based on a specified column.
+    
+    Parameters:
+    - df: DataFrame from which to sample.
+    - strat_col: String, the column name to stratify by.
+    - frac: Float, the fraction of the data to sample from each stratum.
+    - state: Int, random state for reproducibility.
+    
+    Returns:
+    - DataFrame, stratified sample of the original DataFrame.
+    """
+    
+    return df.groupby(strat_col, group_keys=False).apply(lambda x: x.sample(frac=frac, random_state=state))
+
     
 def compute_mean_ci(data, confidence_level=0.95):
     '''
@@ -197,7 +232,7 @@ def compute_mean_ci(data, confidence_level=0.95):
     
     # Return the confidence interval as a tuple
     return (lower_bound, upper_bound)
-    
+
 def compute_metrics(df, alpha = 0.1, min_eval = 300, upsample = True, normalize = False, weighted = True, confidence = "CI"):
     
     debug = pipeline(df = df, alpha = alpha, upsample = upsample, normalize = normalize, weighted = weighted)
