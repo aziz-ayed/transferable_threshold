@@ -27,7 +27,7 @@ However, the methodology can be applied on top of any predictive model for any s
 
 ## Quick run
 
-In the <a href="https://github.com/aziz-ayed/transferable_threshold/blob/main/Experiments.ipynb" target="_blank" style="text-decoration:none; color: #F08080">Experiments notebook</a>, we provide a full rundown of how to run the method and the other baselines presented in the paper on a synthetic dataset. We also show how to reproduce the experiments presented in the paper. In this codebase, "tau" is used to characterize a target PPV. This can easily be adjusted for different targets (NPV, specificity, sensitivity).
+In the <a href="https://github.com/aziz-ayed/transferable_threshold/blob/main/Experiments.ipynb" target="_blank" style="text-decoration:none; color: #F08080">Experiments notebook</a>, we provide a full rundown of the method and the other baselines presented in the paper on a synthetic dataset. We also show how to reproduce the experiments presented in the paper. In this codebase, "tau" is used to characterize a target PPV. This can easily be adjusted for different objectives (NPV, specificity, sensitivity).
 
 For a quick run on your own dataset:
 
