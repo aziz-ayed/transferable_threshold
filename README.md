@@ -21,7 +21,7 @@ However, the methodology can be applied on top of any predictive model for any s
 1. [Quick run](#quick-run)
 1. [Method](#method)
 1. [Results](#results)
-   * [Datasets](#datasets)
+   * [Dataset](#dataset)
    * [Experiments](#experiments)
 
 
