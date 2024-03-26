@@ -1,4 +1,4 @@
-# Transferable thresholding of predictive models
+# Transferable thresholding for predictive models
 
 Transferring and adjusting decision rules for predictive models in new settings, with seamless adaptation between data-scarce and data-rich environments.
 
