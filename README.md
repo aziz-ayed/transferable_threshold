@@ -38,7 +38,7 @@ from utils.models import *
 # Initialize the method
 transfer = TransferableThreshold()
 
-# Compute the optimal threshold
+# Compute the optimal threshold to achieve a PPV of alpha
 transfer.pipeline(df_source, df_target, domain, risk, 
                                             gold, alpha=alpha)["tau"]
 ```
